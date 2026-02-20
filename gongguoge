@@ -1,65 +1,341 @@
-<!-- 在管理页面中替换安装部分 -->
-<div id="page-manage" class="hidden">
-    <div class="space-y-4">
-        <!-- 强化版安装引导卡片 -->
-        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-[2rem] border border-white">
-            <h3 class="font-bold text-indigo-900 mb-1 italic text-lg">📲 开启桌面极简模式</h3>
-            <p class="text-xs text-indigo-400 mb-4">像 App 一样全屏运行，不再显示浏览器地址栏</p>
-            
-            <button onclick="handleInstall()" class="w-full py-3 bg-indigo-500 text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all mb-3">
-                一键尝试添加
-            </button>
-            
-            <!-- 安卓专属的小字提示 -->
-            <p id="android-hint" class="text-[10px] text-slate-400 text-center px-4 leading-relaxed">
-                若点击无效，请点击 Chrome 右上角 <span class="font-bold text-slate-600">“三个点 ⋮”</span><br>
-                选择 <span class="font-bold text-indigo-500">“添加到主屏幕”</span> 或 <span class="font-bold text-indigo-500">“安装应用”</span>
-            </p>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>开心功过格 · 极简修身版</title>
+    
+    <!-- PWA 配置 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="开心功过格">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/5904/5904053.png">
+    <link id="manifest-link" rel="manifest" href='data:application/json,{"name":"开心功过格","short_name":"功过格","start_url":".","display":"standalone","background_color":"#f7f9fb","theme_color":"#8da9c4","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/5904/5904053.png","sizes":"512x512","type":"image/png"}]}'>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg-color: #f7f9fb; --accent-color: #8da9c4; }
+        body { background-color: var(--bg-color); font-family: 'Noto Sans SC', sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
+        .soft-shadow { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05); }
+        .item-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid transparent; }
+        .item-card:active { transform: scale(0.96); filter: brightness(0.95); }
+        ::-webkit-scrollbar { display: none; }
+        .glass-nav { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); border-top: 1px solid rgba(255, 255, 255, 0.3); }
+        .tab-active { color: var(--accent-color); position: relative; }
+        .tab-active::after { content: ''; position: absolute; bottom: 6px; width: 12px; height: 4px; background: var(--accent-color); border-radius: 10px; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .animate-slide-up { animation: slideUp 0.4s cubic-bezier(0, 0, 0.2, 1); }
+    </style>
+</head>
+<body class="pb-28">
+
+    <!-- 顶栏 -->
+    <div class="sticky top-0 z-50 px-6 py-4 flex justify-between items-end bg-[#f7f9fb]/80 backdrop-blur-md">
+        <div>
+            <h1 class="text-2xl font-black text-slate-700 tracking-tight">开心实修</h1>
+            <p id="topDate" class="text-[11px] text-slate-400 font-medium mt-1"></p>
         </div>
-        <!-- ... 剩下的管理项 ... -->
+        <div class="bg-white px-4 py-2 rounded-2xl soft-shadow text-right min-w-[100px]">
+            <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">今日净分</p>
+            <p id="topNetScore" class="text-2xl font-black italic text-slate-700">0</p>
+        </div>
     </div>
-</div>
+
+    <main class="px-5">
+        <!-- 页面：记录 -->
+        <div id="page-record">
+            <div class="flex p-1.5 bg-slate-200/50 rounded-3xl mb-6 gap-1">
+                <button onclick="changeType('gong')" id="btn-gong" class="flex-1 py-3 rounded-2xl text-sm font-bold bg-white text-emerald-600 soft-shadow">🌿 积功 <span id="countGong">0</span></button>
+                <button onclick="changeType('guo')" id="btn-guo" class="flex-1 py-3 rounded-2xl text-sm font-bold text-slate-400">☁️ 改过 <span id="countGuo">0</span></button>
+            </div>
+            <div class="relative mb-6">
+                <input type="text" id="searchInput" oninput="renderList()" placeholder="搜索觉察..." class="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-white border-none soft-shadow text-sm focus:ring-2 focus:ring-blue-100 placeholder-slate-300">
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 opacity-30">🔍</span>
+            </div>
+            <div id="itemList" class="space-y-4"></div>
+        </div>
+
+        <!-- 页面：日历 -->
+        <div id="page-calendar" class="hidden">
+            <div class="bg-white rounded-[2rem] p-6 soft-shadow mb-6">
+                <div class="flex justify-between items-center mb-6 px-2">
+                    <button onclick="moveMonth(-1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400">‹</button>
+                    <h2 id="calMonthTitle" class="font-bold text-slate-700"></h2>
+                    <button onclick="moveMonth(1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400">›</button>
+                </div>
+                <div id="calGrid" class="grid grid-cols-7 gap-2 text-center text-[10px]"></div>
+            </div>
+            <div id="dayDetail" class="bg-white/60 rounded-[2rem] p-6 border border-white hidden">
+                <h3 class="font-bold text-slate-600 mb-4" id="detailDate"></h3>
+                <ul id="detailList" class="space-y-3"></ul>
+            </div>
+        </div>
+
+        <!-- 页面：统计 -->
+        <div id="page-stats" class="hidden text-center">
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="bg-[#eef5f2] p-6 rounded-[2rem] border border-white">
+                    <p class="text-[10px] text-emerald-600 font-bold mb-1">本月净分</p>
+                    <p id="statMonthScore" class="text-3xl font-black text-emerald-700">0</p>
+                </div>
+                <div class="bg-[#fcf8f1] p-6 rounded-[2rem] border border-white">
+                    <p class="text-[10px] text-amber-600 font-bold mb-1">精进天数</p>
+                    <p id="statMonthDays" class="text-3xl font-black text-amber-700">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-8 rounded-[2rem] soft-shadow text-slate-500 text-sm" id="analysisContent"></div>
+        </div>
+
+        <!-- 页面：管理 -->
+        <div id="page-manage" class="hidden">
+            <div class="space-y-4">
+                <!-- 添加到桌面卡片 -->
+                <div class="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-[2rem] text-white shadow-xl shadow-indigo-100">
+                    <h3 class="font-bold text-lg mb-1 italic">开启桌面极简模式</h3>
+                    <p class="text-[10px] opacity-80 mb-5">无需打开浏览器，从桌面一键修行</p>
+                    <button onclick="handleInstall()" class="w-full py-4 bg-white text-indigo-600 font-black rounded-2xl soft-shadow active:scale-95 transition-all">
+                        📲 立即添加到桌面
+                    </button>
+                </div>
+
+                <div class="bg-white p-6 rounded-[2rem] soft-shadow">
+                    <h3 class="font-bold text-slate-700 mb-4">🪙 助捐金钱换算</h3>
+                    <div class="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl">
+                        <span class="text-xs text-slate-400">每涉及</span>
+                        <input type="number" id="moneyRateInput" onchange="saveRate()" class="w-20 bg-transparent font-black text-blue-500 text-center outline-none border-b-2 border-blue-100">
+                        <span class="text-xs text-slate-400">元，记 1 分</span>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 gap-3">
+                    <button onclick="doExport()" class="w-full py-4 bg-white text-slate-600 font-bold rounded-2xl soft-shadow">📤 备份数据到本地</button>
+                    <button onclick="doClear()" class="w-full py-4 bg-red-50 text-red-400 font-bold rounded-2xl mt-4">🗑️ 清空所有记录</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 引导弹窗 (通用版) -->
+    <div id="install-guide" class="fixed inset-0 z-[100] hidden">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeGuide()"></div>
+        <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-[3rem] p-8 animate-slide-up">
+            <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8"></div>
+            <h3 id="guide-title" class="text-xl font-black text-slate-800 mb-6 text-center">添加到桌面</h3>
+            <div id="guide-content" class="space-y-6 mb-10 text-slate-600 text-sm italic">
+                <!-- 动态注入内容 -->
+            </div>
+            <button onclick="closeGuide()" class="w-full py-4 bg-slate-900 text-white font-bold rounded-2xl">好，我去试试</button>
+        </div>
+    </div>
+
+    <!-- 导航栏 -->
+    <nav class="fixed bottom-6 left-6 right-6 h-20 glass-nav rounded-[2.5rem] soft-shadow flex justify-around items-center z-50 px-2">
+        <button onclick="showPage('record')" id="nav-record" class="flex-1 flex flex-col items-center gap-1 tab-active"><span class="text-xl">✨</span><span class="text-[10px] font-bold">修持</span></button>
+        <button onclick="showPage('calendar')" id="nav-calendar" class="flex-1 flex flex-col items-center gap-1 text-slate-300"><span class="text-xl">📅</span><span class="text-[10px] font-bold">时光</span></button>
+        <button onclick="showPage('stats')" id="nav-stats" class="flex-1 flex flex-col items-center gap-1 text-slate-300"><span class="text-xl">📈</span><span class="text-[10px] font-bold">精进</span></button>
+        <button onclick="showPage('manage')" id="nav-manage" class="flex-1 flex flex-col items-center gap-1 text-slate-300"><span class="text-xl">⚙️</span><span class="text-[10px] font-bold">设置</span></button>
+    </nav>
 
 <script>
-// --- 核心：让 Chrome 认出这是个 App 的代码 ---
+// --- 数据库 ---
+const DB = {
+    gong: [
+        {s:100, t:"救免一人死", m:"救人性命/重大救援"}, {s:100, t:"完一妇女节", m:"守护他人贞洁名誉"}, {s:100, t:"阻人不溺一子女", m:"保护婴幼儿生命"}, {s:100, t:"为人延一嗣", m:"助人成家立业"},
+        {s:50, t:"免堕一胎", m:"劝阻堕胎"}, {s:50, t:"当欲染境，守正不染", m:"面对诱惑保持操守"}, {s:50, t:"收养一无倚", m:"照顾孤儿/无依无靠"}, {s:50, t:"葬一无主骸骨", m:"安葬无名遗骸"}, {s:50, t:"救免一人流离", m:"帮人安顿家园"}, {s:50, t:"救免一人军徒重罪", m: "法律援助免重刑"}, {s:50, t:"白一人冤", m:"洗清冤屈"}, {s:50, t:"发一言利及百姓", m:"利民建议"},
+        {s:30, t:"施一葬地与无土之家", m:"捐赠墓地"}, {s:30, t:"化一为非者改行", m:"引导作恶者改过"}, {s:30, t:"度一受戒弟子", m:"引导信仰"}, {s:30, t:"完聚一人夫妇", m:"促成家庭团圆"}, {s:30, t:"收养一无主遗弃门孩", m:"收养弃儿"}, {s:30, t:"成就一人德业", m:"资助完成品学"},
+        {s:10, t:"荐引一有德人", m:"举贤荐能"}, {s:10, t:"除一人害", m:"消除社会隐患"}, {s:10, t:"编纂一切众经法", m:"传播经典"}, {s:10, t:"以方术治一人重病", m:"医治重疾"}, {s:10, t:"发至德之言", m:"发表极善言论"}, {s:10, t:"有财势可使而不使", m:"有权不滥用"}, {s:10, t:"善遗妾婢", m:"善待下属"}, {s:10, t:"救一有力报人之畜命", m:"救功劳动物"},
+        {s:5, t:"劝息一人讼", m:"平息恶意官司"}, {s:5, t:"传人一保益性命事", m:"分享健康常识"}, {s:5, t:"编纂一保益性命经法", m:"编写益寿内容"}, {s:5, t:"以方术救一人轻疾", m:"治愈轻微病症"}, {s:5, t:"劝止传播人恶", m:"阻止是非"}, {s:5, t:"供养一贤善人", m:"资助有德修行者"}, {s:5, t:"祈福禳灾等，许善愿不杀生", m:"不杀生环保心愿"}, {s:5, t:"救一无力报人之畜命", m:"救助一般小动物"},
+        {s:3, t:"受一横不嗔", m:"遇横祸不动怒"}, {s:3, t:"任一谤不辩", m:"遭诽谤不争辩"}, {s:3, t:"受一逆耳言", m:"虚心接受批评"}, {s:3, t:"免一应责人", m:"宽恕应责者"}, {s:3, t:"劝杀生者改业", m:"劝屠夫猎人改行"}, {s:3, t:"葬一自死畜类", m:"掩埋死后动物"},
+        {s:1, t:"赞一人善", m:"表扬他人"}, {s:1, t:"掩一人恶", m:"为人遮丑"}, {s:1, t:"劝息一人争", m:"调解纠纷"}, {s:1, t:"阻人一非为事", m:"阻止错事"}, {s:1, t:"济一人饥", m:"给饭吃"}, {s:1, t:"留无归人一宿", m:"提供住宿"}, {s:1, t:"救一人寒", m:"给衣穿"}, {s:1, t:"施药一服", m:"施舍药物"}, {s:1, t:"施行劝济人书文", m:"传播善书"}, {s:1, t:"诵经一卷", m:"完成功课"}, {s:1, t:"礼忏百拜", m:"忏悔百次"}, {s:1, t:"诵佛号千声", m:"念佛千声"}, {s:1, t:"讲演善法，谕及十人", m:"宣讲智慧"}, {s:1, t:"兴事利及十人", m:"利益十人"}, {s:1, t:"拾得遗字一千", m:"敬惜字纸"}, {s:1, t:"饭一僧", m:"供养修行者饭食"}, {s:1, t:"护持僧众一人", m:"护持修行人"}, {s:1, t:"不拒乞人", m:"礼待乞讨者"}, {s:1, t:"接济人畜一时疲顿", m:"帮人减轻疲累"}, {s:1, t: "见人有忧，善为解慰", m:"安慰他人"}, {s:1, t:"肉食人持斋一日", m:"茹素一天"}, {s:1, t:"见杀不食。闻杀不食。为己杀不食", m:"三不食原则"}, {s:1, t:"葬一自死禽类", m:"埋葬小鸟"}, {s:1, t:"放一生", m:"解救生命"}, {s:1, t:"救一细微湿化之属命", m:"救昆虫蚂蚁"},
+        {s:1, t:"作功果荐沉魂", isM:true}, {s:1, t:"散钱粟衣帛济人", isM:true}, {s:1, t:"饶人债负", isM:true}, {s:1, t:"还人遗物", isM:true}, {s:1, t:"不义之财不取", isM:true}, {s:1, t:"代人完纳债负", isM:true}, {s:1, t:"让地让产", isM:true}, {s:1, t:"劝人出财作种种功德", isM:true}, {s:1, t:"不负寄托财物", isM:true}, {s:1, t:"建仓平粜、修造路桥、疏河掘井", isM:true}, {s:1, t:"修置三宝寺院、造三宝尊像及施香烛灯油等", isM:true}, {s:1, t:"施茶水、舍棺木一切方便等事", isM:true}
+    ],
+    guo: [
+        {s:100, t:"致一人死", m:"间接害命"}, {s:100, t:"失一妇女节", m:"毁人名誉"}, {s:100, t:"赞人溺一子女", m:"支持弃婴"}, {s:100, t:"绝一人嗣", m:"绝人后代"},
+        {s:50, t:"堕一胎", m:"参与堕胎"}, {s:50, t:"破一人婚", m:"拆散婚姻"}, {s:50, t:"抛一人骸", m:"亵渎遗骨"}, {s:50, t:"谋人妻女", m:"不正当关系"}, {s:50, t:"致一人流离", m:"害人家破流落"}, {s:50, t:"致一人军徒重罪", m:"陷人重罪"}, {s:50, t:"教人不忠不孝大恶等事", m:"煽动恶行"}, {s:50, t:"发一言害及百姓", m:"恶言害众"},
+        {s:30, t:"造谤污陷一人", m:"捏造诋毁"}, {s:30, t:"摘发一人阴私与行止事", m:"散布隐私"}, {s:30, t:"唆一人讼", m:"挑动诉讼"}, {s:30, t:"毁一人戒行", m:"诱导破戒"}, {s:30, t:"反背师长", m:"背叛恩师教诲"}, {s:30, t:"抵触父兄", m:"顶撞长辈"}, {s:30, t:"离间人骨肉", m:"挑拨亲情"}, {s:30, t:"荒年积囤五谷不粜生索", m:"困难期牟暴利"},
+        {s:10, t:"排摈一有德人", m:"打击贤能"}, {s:10, t:"荐用一匪人", m:"重用恶人"}, {s:10, t:"平人一冢", m:"破坏墓穴"}, {s:10, t:"凌孤逼寡", m:"欺压弱势"}, {s:10, t:"受畜一失节妇", m:"收留诱德"}, {s:10, t:"畜一杀众生具", m:"经营杀器"}, {s:10, t:"恶语向尊亲、师长、良儒", m:"对家亲粗暴"}, {s:10, t:"修合害人毒药", m:"制假药有害物"}, {s:10, t:"非法用刑", m:"私刑"}, {s:10, t:"毁坏一切正法经典", m:"不重经典"}, {s:10, t:"诵经时，心中杂想恶事", m:"修行不专心"}, {s:10, t:"以外道邪法授人", m:"传播邪见"}, {s:10, t:"发损德之言", m:"损德话"}, {s:10, t:"杀一有力报人之畜命", m:"杀功劳动物"},
+        {s:5, t:"讪谤一切正法经典", m:"诽谤真理"}, {s:5, t:"见一冤可白不白", m:"不申正义"}, {s:5, t:"遇一病求救不救", m:"见急不救"}, {s:5, t:"阻绝一道路桥梁", m:"破坏交通"}, {s:5, t:"编纂一伤化词传", m:"传播庸俗"}, {s:5, t:"造一浑名歌谣", m:"传谣侮辱"}, {s:5, t:"恶口犯平交", m:"对友恶语"}, {s:5, t:"杀一无力报人之畜命", m:"杀一般动物"}, {s:5, t:"非法烹炮生物，使受极苦", m:"残忍杀生"},
+        {s:3, t:"嗔一逆耳言", m:"拒谏动怒"}, {s:3, t:"乖一尊卑次", m:"乱了礼数"}, {s:3, t:"责一不应责人", m:"怪错好人"}, {s:3, t:"播一人恶", m:"宣扬坏处"}, {s:3, t:"两舌离间一人", m:"搬弄是非"}, {s:3, t:"欺诳一无识", m:"骗老实人"}, {s:3, t:"毁人成功", m:"坏人好事"}, {s:3, t:"见人有忧，心生畅快", m:"人忧己乐"}, {s:3, t:"见人失利、失名，心生欢喜", m:"幸灾乐祸"}, {s:3, t:"见人富贵，愿他贫贱", m:"仇富心"}, {s:3, t:"失意辄怨天尤人", m:"抱怨环境"}, {s:3, t:"分外营求", m:"贪婪"},
+        {s:1, t:"没一人善", m:"抹煞他德"}, {s:1, t:"唆一人斗", m:"挑唆斗争"}, {s:1, t:"心中暗举恶意害人", m:"起害心"}, {s:1, t:"助人为非一事", m:"帮人作恶"}, {s:1, t:"见人盗细物不阻", m:"纵容小盗"}, {s:1, t:"见人忧惊不慰", m:"冷漠"}, {s:1, t:"役人畜，不怜疲顿", m:"不恤劳力"}, {s:1, t:"不告人取人一针一草", m:"拿小便宜"}, {s:1, t:"遗弃字纸", m:"不重字纸"}, {s:1, t:"暴弃五谷天物", m:"浪费粮食"}, {s:1, t:"负一约", m:"违约"}, {s:1, t:"醉犯一人", m:"酒后冒犯"}, {s:1, t:"见一人饥寒不救济", m:"不救急"}, {s:1, t:"诵经差漏一字句", m:"念经不虔"}, {s:1, t:"僧人乞食不与", m:"拒僧"}, {s:1, t:"拒一乞人", m:"恶待乞丐"}, {s:1, t:"食酒肉五辛，诵经登三宝地", m:"失禁忌"}, {s:1, t:"服一非法服", m:"穿戴不当"}, {s:1, t:"食一报人之畜等肉", m:"吃功劳畜肉"}, {s:1, t:"杀一细微湿化属命以及履巢破卵等事", m:"伤微命"},
+        {s:1, t:"背众受利，伤用他钱", isM:true}, {s:1, t:"负贷", isM:true}, {s:1, t:"负遗", isM:true}, {s:1, t:"负寄托财物", isM:true}, {s:1, t:"因公恃势乞索、巧索，取人一切财物", isM:true}, {s:1, t:"废坏三宝尊像以及殿宇、器用等物", isM:true}, {s:1, t:"斗秤等小出大入", isM:true}, {s:1, t:"贩卖屠刀、渔网等物", isM:true}
+    ]
+};
 
-// 1. 注册 Service Worker (即使是本地内容也尝试注册，提升安装几率)
+// --- PWA Service Worker 注册 (关键) ---
 if ('serviceWorker' in navigator) {
-    const swCode = `self.addEventListener('fetch', function(e) { e.respondWith(fetch(e.request)); });`;
-    const blob = new Blob([swCode], {type: 'application/javascript'});
-    navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {
-        console.log("Service Worker 仅在 HTTPS 下完全生效");
+    window.addEventListener('load', () => {
+        const swBlob = new Blob([`self.addEventListener('fetch', (e) => {});`], {type: 'text/javascript'});
+        navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
     });
 }
 
-// 2. 捕获安卓安装事件
+// --- 变量与初始化 ---
+let logs = JSON.parse(localStorage.getItem('kaixin_160_final') || '[]');
+let rate = parseFloat(localStorage.getItem('kaixin_money_rate') || '100');
+let currentType = 'gong';
+let viewDate = new Date();
 let deferredPrompt;
+
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    // 捕获到事件后，让按钮颜色变深，提醒用户可以点击
-    console.log('已经捕获到安卓安装触发器');
 });
 
-// 3. 处理点击
+function init() {
+    const today = new Date();
+    document.getElementById('topDate').innerText = `${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日 · ${['周日','周一','周二','周三','周四','周五','周六'][today.getDay()]}`;
+    document.getElementById('moneyRateInput').value = rate;
+    renderList();
+    updateScore();
+}
+
+// --- 安装桌面逻辑 ---
 function handleInstall() {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    
+    const guide = document.getElementById('install-guide');
+    const content = document.getElementById('guide-content');
+    const title = document.getElementById('guide-title');
+
     if (isIOS) {
-        // 苹果显示半屏引导
-        document.getElementById('ios-guide').classList.remove('hidden');
+        title.innerText = "苹果手机添加指南";
+        content.innerHTML = `
+            <div class="flex items-center gap-4"><div class="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center">1</div><p>点击浏览器底部的“分享”按钮 (方框向上箭头)</p></div>
+            <div class="flex items-center gap-4"><div class="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center">2</div><p>向上滑动，找到“添加到主屏幕”</p></div>
+            <div class="flex items-center gap-4"><div class="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center">3</div><p>点击右上角的“添加”即可</p></div>
+        `;
+        guide.classList.remove('hidden');
     } else if (deferredPrompt) {
-        // 如果是安卓且浏览器支持弹出提示
         deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choice) => {
-            if (choice.outcome === 'accepted') {
-                alert("太棒了！请查看你的手机桌面。");
-            }
-            deferredPrompt = null;
-        });
+        deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
     } else {
-        // 如果无法弹出（比如非 HTTPS 访问）
-        alert("【手动添加步骤】\n\n1. 点击浏览器右上角的 '三个点 ⋮'\n2. 找到 '添加到主屏幕' (Add to Home screen)\n3. 确认即可！");
+        title.innerText = "安卓手机添加指南";
+        content.innerHTML = `
+            <p class="text-amber-500 mb-4 font-bold">由于您是在文件模式下打开，无法自动弹出安装框，请按以下步骤手动添加：</p>
+            <div class="flex items-center gap-4"><div class="w-8 h-8 bg-indigo-50 rounded-full flex items-center justify-center">1</div><p>点击 Chrome 右上角“三个点 ⋮”菜单</p></div>
+            <div class="flex items-center gap-4"><div class="w-8 h-8 bg-indigo-50 rounded-full flex items-center justify-center">2</div><p>找到“添加到主屏幕”或“安装应用”</p></div>
+            <div class="flex items-center gap-4"><div class="w-8 h-8 bg-indigo-50 rounded-full flex items-center justify-center">3</div><p>确认添加，图标即会出现在桌面</p></div>
+        `;
+        guide.classList.remove('hidden');
     }
 }
+
+function closeGuide() { document.getElementById('install-guide').classList.add('hidden'); }
+
+// --- 业务逻辑 ---
+function changeType(t) {
+    currentType = t;
+    const isGong = t === 'gong';
+    document.getElementById('btn-gong').className = isGong ? 'flex-1 py-3 rounded-2xl text-sm font-bold bg-white text-emerald-600 soft-shadow' : 'flex-1 py-3 rounded-2xl text-sm font-bold text-slate-400';
+    document.getElementById('btn-guo').className = !isGong ? 'flex-1 py-3 rounded-2xl text-sm font-bold bg-white text-rose-500 soft-shadow' : 'flex-1 py-3 rounded-2xl text-sm font-bold text-slate-400';
+    renderList();
+}
+
+function renderList() {
+    const list = document.getElementById('itemList');
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const data = DB[currentType];
+    const filtered = data.filter(i => i.t.includes(search));
+    list.innerHTML = filtered.map(i => `
+        <div class="item-card bg-white p-5 rounded-[1.5rem] soft-shadow flex justify-between items-center" onclick="handleClick('${i.t}', ${i.s}, ${!!i.isM})">
+            <div class="flex-1 pr-4">
+                <div class="flex items-center gap-2 mb-1.5"><span class="text-[9px] font-bold px-2 py-0.5 rounded-full ${currentType==='gong'?'bg-emerald-50 text-emerald-500':'bg-rose-50 text-rose-400'}">准${i.s}级</span><span class="text-[15px] font-bold text-slate-700">${i.t}</span></div>
+                <p class="text-[11px] text-slate-400 leading-tight">${i.isM ? `每涉及 ${rate} 元记 1 分` : (i.m || "保持觉察")}</p>
+            </div>
+            <span class="text-xl font-black ${currentType==='gong'?'text-emerald-500':'text-rose-400'}">${currentType==='gong'?'+':'-'}</span>
+        </div>
+    `).join('');
+    document.getElementById('countGong').innerText = DB.gong.length;
+    document.getElementById('countGuo').innerText = DB.guo.length;
+}
+
+function handleClick(t, s, isM) {
+    const mult = currentType === 'gong' ? 1 : -1;
+    if (isM) {
+        const amt = prompt(`请输入涉及金额（${rate}元/分）：`, rate);
+        if (amt && !isNaN(amt)) addLog(`${t}(${amt}元)`, Math.floor(amt / rate) * s * mult);
+    } else addLog(t, s * mult);
+}
+
+function addLog(t, s) {
+    logs.push({ t, s, d: new Date().toISOString().split('T')[0], ts: Date.now() });
+    localStorage.setItem('kaixin_160_final', JSON.stringify(logs));
+    updateScore();
+    if(navigator.vibrate) navigator.vibrate(40);
+}
+
+function updateScore() {
+    const today = new Date().toISOString().split('T')[0];
+    const score = logs.filter(l => l.d === today).reduce((sum, l) => sum + l.s, 0);
+    const el = document.getElementById('topNetScore');
+    el.innerText = (score > 0 ? '+' : '') + score;
+    el.className = `text-2xl font-black italic ${score > 0 ? 'text-emerald-500' : (score < 0 ? 'text-rose-400' : 'text-slate-700')}`;
+}
+
+function showPage(p) {
+    ['record', 'calendar', 'stats', 'manage'].forEach(id => {
+        document.getElementById(`page-${id}`).classList.add('hidden');
+        document.getElementById(`nav-${id}`).classList.replace('tab-active', 'text-slate-300');
+    });
+    document.getElementById(`page-${p}`).classList.remove('hidden');
+    document.getElementById(`nav-${p}`).classList.replace('text-slate-300', 'tab-active');
+    if(p === 'calendar') renderCalendar();
+    if(p === 'stats') renderStats();
+}
+
+function moveMonth(s) { viewDate.setMonth(viewDate.getMonth() + s); renderCalendar(); }
+
+function renderCalendar() {
+    document.getElementById('calMonthTitle').innerText = `${viewDate.getFullYear()}年${viewDate.getMonth()+1}月`;
+    const days = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = ['日','一','二','三','四','五','六'].map(w => `<div class="text-slate-300 mb-2">${w}</div>`).join('');
+    const firstDay = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getDay();
+    for(let i=0; i<firstDay; i++) grid.innerHTML += `<div></div>`;
+    for(let d=1; d<=days; d++) {
+        const dStr = `${viewDate.getFullYear()}-${String(viewDate.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dayLogs = logs.filter(l => l.d === dStr);
+        const score = dayLogs.reduce((sum, l) => sum + l.s, 0);
+        let style = "bg-slate-50 text-slate-300 opacity-40";
+        if(dayLogs.length) style = score >= 0 ? "bg-emerald-400 text-white soft-shadow" : "bg-rose-300 text-white soft-shadow";
+        grid.innerHTML += `<div class="aspect-square flex flex-col items-center justify-center rounded-2xl transition-all ${style}" onclick="showDetail('${dStr}')"><span class="font-bold">${d}</span></div>`;
+    }
+}
+
+function showDetail(dStr) {
+    const dayLogs = logs.filter(l => l.d === dStr);
+    if(!dayLogs.length) return;
+    document.getElementById('dayDetail').classList.remove('hidden');
+    document.getElementById('detailDate').innerText = '📅 ' + dStr;
+    document.getElementById('detailList').innerHTML = dayLogs.map(l => `<li class="flex justify-between bg-white p-4 rounded-2xl text-xs soft-shadow"><span>${l.t}</span><span class="font-bold ${l.s>0?'text-emerald-500':'text-rose-400'}">${l.s>0?'+':''}${l.s}</span></li>`).join('');
+}
+
+function renderStats() {
+    const now = new Date();
+    const prefix = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const mLogs = logs.filter(l => l.d.startsWith(prefix));
+    const score = mLogs.reduce((sum, l) => sum + l.s, 0);
+    document.getElementById('statMonthScore').innerText = score;
+    document.getElementById('statMonthDays').innerText = [...new Set(mLogs.map(l => l.d))].length;
+    document.getElementById('analysisContent').innerHTML = `<p class="mb-2">🌸 <b>本月觉察：</b></p><p>您本月共进行了 ${mLogs.length} 次反思，净分为 ${score}。命自我造，福自我求，日日不断，功不唐捐。</p>`;
+}
+
+function saveRate() {
+    rate = parseFloat(document.getElementById('moneyRateInput').value) || 100;
+    localStorage.setItem('kaixin_money_rate', rate);
+    alert("更新成功");
+}
+
+function doExport() {
+    const data = JSON.stringify(logs, null, 2);
+    const blob = new Blob([data], {type: 'text/plain'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `功过格_备份_${new Date().toISOString().split('T')[0]}.txt`; a.click();
+}
+
+function doClear() { if(confirm("确定永久清空所有记录吗？")) { localStorage.clear(); location.reload(); } }
+
+init();
 </script>
+</body>
+</html>
