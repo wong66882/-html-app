@@ -1,0 +1,65 @@
+<!-- 在管理页面中替换安装部分 -->
+<div id="page-manage" class="hidden">
+    <div class="space-y-4">
+        <!-- 强化版安装引导卡片 -->
+        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-[2rem] border border-white">
+            <h3 class="font-bold text-indigo-900 mb-1 italic text-lg">📲 开启桌面极简模式</h3>
+            <p class="text-xs text-indigo-400 mb-4">像 App 一样全屏运行，不再显示浏览器地址栏</p>
+            
+            <button onclick="handleInstall()" class="w-full py-3 bg-indigo-500 text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all mb-3">
+                一键尝试添加
+            </button>
+            
+            <!-- 安卓专属的小字提示 -->
+            <p id="android-hint" class="text-[10px] text-slate-400 text-center px-4 leading-relaxed">
+                若点击无效，请点击 Chrome 右上角 <span class="font-bold text-slate-600">“三个点 ⋮”</span><br>
+                选择 <span class="font-bold text-indigo-500">“添加到主屏幕”</span> 或 <span class="font-bold text-indigo-500">“安装应用”</span>
+            </p>
+        </div>
+        <!-- ... 剩下的管理项 ... -->
+    </div>
+</div>
+
+<script>
+// --- 核心：让 Chrome 认出这是个 App 的代码 ---
+
+// 1. 注册 Service Worker (即使是本地内容也尝试注册，提升安装几率)
+if ('serviceWorker' in navigator) {
+    const swCode = `self.addEventListener('fetch', function(e) { e.respondWith(fetch(e.request)); });`;
+    const blob = new Blob([swCode], {type: 'application/javascript'});
+    navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {
+        console.log("Service Worker 仅在 HTTPS 下完全生效");
+    });
+}
+
+// 2. 捕获安卓安装事件
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // 捕获到事件后，让按钮颜色变深，提醒用户可以点击
+    console.log('已经捕获到安卓安装触发器');
+});
+
+// 3. 处理点击
+function handleInstall() {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    
+    if (isIOS) {
+        // 苹果显示半屏引导
+        document.getElementById('ios-guide').classList.remove('hidden');
+    } else if (deferredPrompt) {
+        // 如果是安卓且浏览器支持弹出提示
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choice) => {
+            if (choice.outcome === 'accepted') {
+                alert("太棒了！请查看你的手机桌面。");
+            }
+            deferredPrompt = null;
+        });
+    } else {
+        // 如果无法弹出（比如非 HTTPS 访问）
+        alert("【手动添加步骤】\n\n1. 点击浏览器右上角的 '三个点 ⋮'\n2. 找到 '添加到主屏幕' (Add to Home screen)\n3. 确认即可！");
+    }
+}
+</script>
